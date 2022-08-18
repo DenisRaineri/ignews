@@ -1,17 +1,16 @@
-import { useEffect } from "react";
-import { GetStaticProps } from "next";
-import { useRouter } from "next/router";
+import { GetStaticPaths, GetStaticProps } from "next";
+import { useSession } from "next-auth/react";
 import Head from "next/head";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
-
+import { useRouter } from "next/router";
 import { RichText } from "prismic-dom";
+import { useEffect } from "react";
+
 import { getPrismicClient } from "../../../services/prismic";
-import { ISession } from "../../api/auth/[...nextauth]";
 
 import styles from "../post.module.scss";
 
-export interface IPostPreviewProps {
+interface PostPreviewProps {
   post: {
     slug: string;
     title: string;
@@ -20,17 +19,15 @@ export interface IPostPreviewProps {
   };
 }
 
-export default function PostPreview({ post }: IPostPreviewProps) {
-  const { data } = useSession();
+export default function PostPreview({ post }: PostPreviewProps) {
+  const { data: session } = useSession();
   const router = useRouter();
 
   useEffect(() => {
-    const postSession = data as ISession;
-
-    if (postSession?.activeSubscription) {
+    if (session?.activeSubscription) {
       router.push(`/posts/${post.slug}`);
     }
-  }, [post, router, data]);
+  }, [session]);
 
   return (
     <>
@@ -45,7 +42,7 @@ export default function PostPreview({ post }: IPostPreviewProps) {
           <div
             className={`${styles.postContent} ${styles.previewContent}`}
             dangerouslySetInnerHTML={{ __html: post.content }}
-          />
+          ></div>
 
           <div className={styles.continueReading}>
             Wanna continue reading?
@@ -59,7 +56,7 @@ export default function PostPreview({ post }: IPostPreviewProps) {
   );
 }
 
-export const getStaticPaths = () => {
+export const getStaticPaths: GetStaticPaths = async () => {
   return {
     paths: [],
     fallback: "blocking",
@@ -67,16 +64,20 @@ export const getStaticPaths = () => {
 };
 
 export const getStaticProps: GetStaticProps = async ({ params }) => {
+  // save slug
   const { slug } = params;
 
+  // prismic client
   const prismic = getPrismicClient();
 
-  const response = await prismic.getByUID("publication", String(slug), {});
+  // search for slug
+  const response = await prismic.getByUID<any>("publication", String(slug), {});
 
+  // data formatting
   const post = {
     slug,
-    title: response.data.Title,
-    content: RichText.asHtml(response.data.Content.splice(0, 3)),
+    title: RichText.asText(response.data.title),
+    content: RichText.asHtml(response.data.content.splice(0, 3)),
     updatedAt: new Date(response.last_publication_date).toLocaleDateString(
       "pt-BR",
       {

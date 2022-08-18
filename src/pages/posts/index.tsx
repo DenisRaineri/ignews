@@ -1,10 +1,12 @@
 import { GetStaticProps } from "next";
 import Head from "next/head";
-import { getPrismicClient } from "../../services/prismic";
-import styles from "./styles.module.scss";
-import * as prismic from "@prismicio/client";
+import Prismic from "@prismicio/client";
 import { RichText } from "prismic-dom";
 import Link from "next/link";
+
+import { getPrismicClient } from "../../services/prismic";
+
+import styles from "./styles.module.scss";
 
 type Post = {
   slug: string;
@@ -13,7 +15,11 @@ type Post = {
   updatedAt: string;
 };
 
-export default function Posts({ posts }) {
+interface PostsProps {
+  posts: Post[];
+}
+
+export default function Posts({ posts }: PostsProps) {
   return (
     <>
       <Head>
@@ -23,7 +29,7 @@ export default function Posts({ posts }) {
       <main className={styles.container}>
         <div className={styles.posts}>
           {posts.map((post) => (
-            <Link href={`/posts/preview/${post.slug}`} key={post.slug}>
+            <Link key={post.slug} href={`/posts/${post.slug}`}>
               <a>
                 <time>{post.updatedAt}</time>
                 <strong>{post.title}</strong>
@@ -38,12 +44,12 @@ export default function Posts({ posts }) {
 }
 
 export const getStaticProps: GetStaticProps = async () => {
-  const client = getPrismicClient();
+  const prismic = getPrismicClient();
 
-  const response = await client.query(
-    [prismic.predicates.at("document.type", "publication")],
+  const response = await prismic.query<any>(
+    [Prismic.predicates.at("document.type", "publication")],
     {
-      fetch: ["publication.Title", "publication.Content"],
+      fetch: ["publication.title", "publication.content"],
       pageSize: 100,
     }
   );
@@ -51,10 +57,10 @@ export const getStaticProps: GetStaticProps = async () => {
   const posts = response.results.map((post) => {
     return {
       slug: post.uid,
-      title: post.data.Title,
+      title: RichText.asText(post.data.title),
       excerpt:
-        post.data.Content.find((content) => content.type === "paragraph")
-          ?.text ?? "Veja mais...",
+        post.data.content.find((content) => content.type === "paragraph")
+          ?.text ?? "",
       updatedAt: new Date(post.last_publication_date).toLocaleDateString(
         "pt-BR",
         {
@@ -67,6 +73,8 @@ export const getStaticProps: GetStaticProps = async () => {
   });
 
   return {
-    props: { posts },
+    props: {
+      posts,
+    },
   };
 };

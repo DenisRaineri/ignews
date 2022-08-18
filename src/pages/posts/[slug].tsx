@@ -1,15 +1,13 @@
 import { GetServerSideProps } from "next";
-import Head from "next/head";
 import { getSession } from "next-auth/react";
-
+import Head from "next/head";
 import { RichText } from "prismic-dom";
-import { getPrismicClient } from "../../services/prismic";
-import { ISession } from "../api/auth/[...nextauth]";
 
-// import { IPostProps } from "../../@interfaces/pages/posts";
+import { getPrismicClient } from "../../services/prismic";
+
 import styles from "./post.module.scss";
 
-export interface IPostProps {
+interface PostProps {
   post: {
     slug: string;
     title: string;
@@ -18,7 +16,7 @@ export interface IPostProps {
   };
 }
 
-export default function Post({ post }: IPostProps) {
+export default function Post({ post }: PostProps) {
   return (
     <>
       <Head>
@@ -32,7 +30,7 @@ export default function Post({ post }: IPostProps) {
           <div
             className={styles.postContent}
             dangerouslySetInnerHTML={{ __html: post.content }}
-          />
+          ></div>
         </article>
       </main>
     </>
@@ -43,13 +41,16 @@ export const getServerSideProps: GetServerSideProps = async ({
   req,
   params,
 }) => {
-  const session = (await getSession({ req })) as ISession;
+  // check if user still logged in
+  const session = await getSession({ req });
+
   const { slug } = params;
 
+  // redirects to home if user isn't logged in
   if (!session?.activeSubscription) {
     return {
       redirect: {
-        destination: "/",
+        destination: `/posts/preview/${slug}`,
         permanent: false,
       },
     };
@@ -57,12 +58,12 @@ export const getServerSideProps: GetServerSideProps = async ({
 
   const prismic = getPrismicClient(req);
 
-  const response = await prismic.getByUID("publication", String(slug), {});
+  const response = await prismic.getByUID<any>("publication", String(slug), {});
 
   const post = {
     slug,
-    title: response.data.Title,
-    content: RichText.asHtml(response.data.Content),
+    title: RichText.asText(response.data.title),
+    content: RichText.asHtml(response.data.content),
     updatedAt: new Date(response.last_publication_date).toLocaleDateString(
       "pt-BR",
       {
